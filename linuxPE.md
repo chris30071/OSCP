@@ -11,3 +11,4 @@ find / -type f -name ".*" 2>/dev/null | grep -v '^/proc\|^/run\|^/sys' #Find hid
 crontab -l 2>/dev/null
 ls -al /etc/cron* 2>/dev/null #cronjobs
 grep -Ri "password" /etc 2>/dev/null #sensitive strings
+find / -perm -u=s 2>/dev/null | grep -v '^/proc\|^/run\|^/sys\|^/snap' #important command
