@@ -1,0 +1,23 @@
+#Windows privesc
+
+#Situational awareness
+
+whoami /groups(cmd.exe)
+
+#powershell
+ipconfig /all
+route print
+netstat -ano
+
+
+#Hidden in plainview
+
+Get-ChildItem -Path C:\ -Include *.kdbx -File -Recurse -ErrorAction SilentlyContinue
+Get-ChildItem -Path C:\ -Include *.txt,*.ini -File -Recurse -ErrorAction SilentlyContinue
+Get-ChildItem -Path C:\Users\dave\ -Include *.txt,*.pdf,*.xls,*.xlsx,*.doc,*.docx -File -Recurse -ErrorAction SilentlyContinue
+Get-ChildItem -Path C:\ -Recurse -Filter SAM -ErrorAction SilentlyContinue #to find SAM file in all directories #to find SAM files in all directories
+
+#Information goldmine
+
+Get-History
+(Get-PSReadlineOption).HistorySavePath
