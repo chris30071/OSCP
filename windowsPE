@@ -21,3 +21,30 @@ Get-ChildItem -Path C:\ -Recurse -Filter SAM -ErrorAction SilentlyContinue #to f
 
 Get-History
 (Get-PSReadlineOption).HistorySavePath
+
+Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+Get-ChildItem -Path C:\ -Include *.kdbx -File -Recurse -ErrorAction SilentlyContinue
+Get-ChildItem -Path C:\xampp -Include *.txt,*.ini -File -Recurse -ErrorAction SilentlyContinue
+
+#runas commad
+runas /user:backupadmin cmd
+
+#Service binary hijacking
+Get-CimInstance -ClassName win32_service | Select Name,State,PathName | Where-Object {$_.State -like 'Running'}
+icacls "C:\xampp\apache\bin\httpd.exe"
+
+#DLL Hijacking
+Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+
+#unquoted service path
+Get-CimInstance -ClassName win32_service | Select Name,State,PathName
+wmic service get name,pathname |  findstr /i /v "C:\Windows\\" | findstr /i /v """
+
+#Scheduled tasks
+schtasks /query /fo LIST /v
+icacls C:\Users\steve\Pictures\BackendCacheCleanup.exe
+
+#PowerUp.ps1
+. .\PowerUp.ps1
+Get-ModifiableServiceFile
